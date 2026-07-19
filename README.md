@@ -48,6 +48,8 @@ These figures are artifact metadata, not an independent reproduction. For challe
 
 Pickle/joblib artifacts can execute code during loading. Only replace this file with a trusted artifact produced by the team, and update the documented checksum whenever it changes.
 
+The Docker image installs the Bioconda package `ncbi-amrfinderplus=4.2.7` and downloads its reference database during the image build.
+
 ## Decision policy
 
 The model returns probabilities for all three classes. The highest-probability class is used unless its confidence is below `NO_CALL_THRESHOLD`, in which case the result is No-call. A model prediction is kept separate from known AMRFinderPlus evidence; statistical importance is never presented as proof of biological causality.

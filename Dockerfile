@@ -5,7 +5,7 @@ WORKDIR /app
 
 COPY requirements.txt /app/requirements.txt
 RUN micromamba install -y -n base -c conda-forge -c bioconda \
-      python=3.11 amrfinderplus=4.0.23 pip \
+      python=3.11 ncbi-amrfinderplus=4.2.7 pip \
     && micromamba run -n base pip install --no-cache-dir -r /app/requirements.txt \
     && micromamba clean --all --yes
 
@@ -22,4 +22,3 @@ RUN amrfinder_update --database /app/amrfinder-data
 
 EXPOSE 10000
 CMD ["/bin/sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-10000}"]
-

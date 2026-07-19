@@ -7,6 +7,8 @@ from pathlib import Path
 import shutil
 import subprocess
 
+from app.config import settings
+
 
 @dataclass(frozen=True)
 class AmrHit:
@@ -23,6 +25,9 @@ class AmrHit:
 
 
 def run_amrfinder(fasta_path: Path) -> tuple[list[AmrHit], str]:
+    if settings.app_mode == "demo":
+        return _demo_hits(fasta_path), "demo"
+
     executable = shutil.which("amrfinder")
     if not executable:
         return _demo_hits(fasta_path), "demo"

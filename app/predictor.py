@@ -14,21 +14,39 @@ from app.domain import ANTIBIOTICS, matching_markers
 
 
 def predict(hits: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], str]:
-    features = _feature_vector(hits)
     if settings.app_mode == "production":
         if not settings.vertex_configured:
             raise RuntimeError("Vertex AI is not configured for production mode.")
-        raw = _vertex_predict(features)
+        instances = _automl_instances(hits)
+        raw = _vertex_predict(instances)
         return _normalize_vertex_predictions(raw, hits), "vertex-ai"
     return _demo_predict(hits), "demo"
 
 
-def _feature_vector(hits: list[dict[str, Any]]) -> dict[str, int]:
-    genes = {str(hit["gene_symbol"]) for hit in hits}
-    return {gene: 1 for gene in sorted(genes)}
+def _canonical(value: str) -> str:
+    return "".join(character for character in value.lower() if character.isalnum())
 
 
-def _vertex_predict(features: dict[str, int]) -> list[Any]:
+def _automl_instances(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    schema_path = Path(settings.model_schema_path)
+    if not schema_path.is_absolute():
+        schema_path = Path(__file__).resolve().parents[1] / schema_path
+    columns = json.loads(schema_path.read_text(encoding="utf-8"))
+    canonical_columns = {_canonical(column): column for column in columns}
+    present = {
+        canonical_columns[_canonical(str(hit["gene_symbol"]))]
+        for hit in hits
+        if _canonical(str(hit["gene_symbol"])) in canonical_columns
+    }
+    instances = []
+    for profile in ANTIBIOTICS:
+        instance: dict[str, Any] = {column: int(column in present) for column in columns}
+        instance["antibiotic"] = profile.name.lower()
+        instances.append(instance)
+    return instances
+
+
+def _vertex_predict(instances: list[dict[str, Any]]) -> list[Any]:
     from google.cloud import aiplatform
 
     credentials_path = _materialize_render_credentials()
@@ -36,7 +54,7 @@ def _vertex_predict(features: dict[str, int]) -> list[Any]:
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = credentials_path
     aiplatform.init(project=settings.gcp_project_id, location=settings.gcp_region)
     endpoint = aiplatform.Endpoint(settings.gcp_endpoint_id)
-    response = endpoint.predict(instances=[features])
+    response = endpoint.predict(instances=instances)
     return list(response.predictions)
 
 
@@ -53,20 +71,25 @@ def _materialize_render_credentials() -> str | None:
 
 
 def _normalize_vertex_predictions(raw: list[Any], hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    if not raw:
+    if len(raw) != len(ANTIBIOTICS):
         raise RuntimeError("Vertex AI returned no predictions.")
-    first = raw[0]
-    records = first.get("predictions", first) if isinstance(first, dict) else first
-    if isinstance(records, dict):
-        records = [records]
-    by_name = {str(item.get("antibiotic", "")).lower(): item for item in records}
     results = []
     genes = [str(hit["gene_symbol"]) for hit in hits]
-    for profile in ANTIBIOTICS:
-        model_item = by_name.get(profile.name.lower(), {})
-        probability = float(model_item.get("resistance_probability", 0.5))
+    for profile, model_item in zip(ANTIBIOTICS, raw):
+        probability = _resistance_probability(model_item)
         results.append(_decision(profile, probability, genes))
     return results
+
+
+def _resistance_probability(prediction: Any) -> float:
+    if not isinstance(prediction, dict):
+        raise RuntimeError("Vertex AI returned an unsupported prediction format.")
+    labels = prediction.get("displayNames") or prediction.get("classes") or []
+    scores = prediction.get("confidences") or prediction.get("scores") or []
+    probabilities = {str(label).lower(): float(score) for label, score in zip(labels, scores)}
+    if "likely to fail" not in probabilities:
+        raise RuntimeError("Vertex AI response does not include the 'likely to fail' class.")
+    return probabilities["likely to fail"]
 
 
 def _demo_predict(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -77,7 +100,7 @@ def _demo_predict(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
         if markers:
             probability = min(0.97, 0.73 + 0.06 * len(markers))
         else:
-            probability = (0.17, 0.46, 0.28, 0.39)[index]
+            probability = (0.17, 0.46, 0.28)[index]
         results.append(_decision(profile, probability, genes))
     return results
 
@@ -115,4 +138,3 @@ def _decision(profile, resistance_probability: float, genes: list[str]) -> dict[
         "evidence_type": evidence_type,
         "evidence": evidence,
     }
-

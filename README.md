@@ -8,7 +8,7 @@ Genome Firewall is a defensive research prototype for the Hack-Nation Genome Fir
 
 - Species: *Klebsiella pneumoniae* only
 - Input: reconstructed nucleotide assembly (`.fa`, `.fasta`, or `.fna`)
-- Antibiotics: meropenem, ciprofloxacin, gentamicin, and ceftazidime
+- Antibiotics: meropenem, ciprofloxacin, and gentamicin
 - Output: Likely to Work, Likely to Fail, or No-call, with calibrated confidence and evidence
 - Explicitly excluded: sample collection, sequencing, assembly, species identification, mixed-sample separation, organism design, and organism modification
 
@@ -16,8 +16,8 @@ Genome Firewall is a defensive research prototype for the Hack-Nation Genome Fir
 
 1. Validate FASTA structure, nucleotide alphabet, size, ambiguity, and fragmentation.
 2. Run AMRFinderPlus in nucleotide mode for *K. pneumoniae*.
-3. Convert detected genes and mutations into a sparse presence/absence feature object.
-4. Send the feature object to a Vertex AI AutoML Endpoint.
+3. Convert detected genes and mutations into the exact 398-column presence/absence schema used by `ml_dataset_gene_final_smote.csv`.
+4. Send one instance per antibiotic to a Vertex AI AutoML Endpoint.
 5. Apply confidence thresholds and the species-level molecular-target gate.
 6. Combine model output with known AMR evidence and render the decision report.
 
@@ -42,28 +42,43 @@ docker build -t genome-firewall .
 docker run --rm -p 10000:10000 --env-file .env genome-firewall
 ```
 
+## Training dataset
+
+The model contract is based on:
+
+`hack_nation/datasets/klebsiella_pneumoniae/ml_dataset_gene_final_smote.csv`
+
+The current file contains 4,353 rows and 401 columns: `antibiotic`, the three-class label `final_call`, 398 binary AMR gene or mutation features, and the organizer-provided `data_split`. The split contains 3,753 training, 300 validation, and 300 test rows. `data_split` is used for evaluation partitioning and removed from model inputs to prevent leakage. The source dataset is intentionally not copied into this repository. Run the preparation script against the organizer-provided file:
+
+```bash
+python scripts/prepare_automl_data.py \
+  --input /path/to/ml_dataset_gene_final_smote.csv \
+  --output training_data/automl_training.csv
+```
+
+Upload the generated 400-column CSV to Cloud Storage and use `final_call` as the Vertex AI AutoML Tabular classification target. Keep `antibiotic` as a categorical input and all remaining columns as numeric binary inputs. Preserve the organizer split when creating the corresponding Vertex AI training, validation, and test data sources; do not randomly re-split rows.
+
+> SMOTE is useful only inside the training partition. Do not apply synthetic oversampling before creating genetically grouped train, calibration, and held-out test splits, because that can leak information and inflate evaluation results.
+
 ## Vertex AI prediction contract
 
-The app sends one sparse feature object. Keys are AMRFinderPlus gene or mutation symbols and values are `1`:
+The app sends three dense feature objects, one per antibiotic. The keys exactly match the training CSV schema:
 
 ```json
 {
-  "blaKPC-2": 1,
+  "antibiotic": "meropenem",
+  "blaKPC_2": 1,
   "ompK36_K231SfsTer16": 1,
-  "oqxA": 1
+  "oqxA": 0
 }
 ```
 
-The endpoint should return one record containing `predictions`, with one object per supported antibiotic:
+Vertex AI AutoML Tabular should return one classification object per input instance. Both standard response variants below are supported (`displayNames`/`confidences` or `classes`/`scores`):
 
 ```json
 {
-  "predictions": [
-    {"antibiotic": "Meropenem", "resistance_probability": 0.91},
-    {"antibiotic": "Ciprofloxacin", "resistance_probability": 0.48},
-    {"antibiotic": "Gentamicin", "resistance_probability": 0.18},
-    {"antibiotic": "Ceftazidime", "resistance_probability": 0.79}
-  ]
+  "displayNames": ["likely to fail", "likely to work", "uncertain"],
+  "confidences": [0.91, 0.06, 0.03]
 }
 ```
 
@@ -84,6 +99,7 @@ The model should be trained and calibrated with genetically grouped splits so ne
 | `GCP_PROJECT_ID` | GCP project containing the endpoint |
 | `GCP_REGION` | Endpoint region, default `us-central1` |
 | `GCP_ENDPOINT_ID` | Deployed Vertex AI Endpoint ID |
+| `MODEL_SCHEMA_PATH` | Packaged list of the 398 model feature columns |
 | `GOOGLE_APPLICATION_CREDENTIALS` | Local service-account JSON path |
 | `GCP_SERVICE_ACCOUNT_JSON_BASE64` | Base64 service-account JSON for Render |
 

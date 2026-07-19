@@ -11,6 +11,7 @@ class Settings:
     gcp_project_id: str = os.getenv("GCP_PROJECT_ID", "")
     gcp_region: str = os.getenv("GCP_REGION", "us-central1")
     gcp_endpoint_id: str = os.getenv("GCP_ENDPOINT_ID", "")
+    model_schema_path: str = os.getenv("MODEL_SCHEMA_PATH", "app/model_schema.json")
     gcp_service_account_json_base64: str = os.getenv(
         "GCP_SERVICE_ACCOUNT_JSON_BASE64", ""
     )
@@ -21,4 +22,3 @@ class Settings:
 
 
 settings = Settings()
-

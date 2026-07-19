@@ -30,12 +30,6 @@ ANTIBIOTICS = (
         "30S ribosomal subunit",
         ("aac(3)", "aac(6')", "ant(2'')", "aph(3')", "armA", "rmtB", "rmtF"),
     ),
-    AntibioticProfile(
-        "Ceftazidime",
-        "Third-generation cephalosporin",
-        "Penicillin-binding proteins",
-        ("blaCTX-M", "blaSHV", "blaTEM", "blaDHA", "blaCMY", "blaKPC", "blaNDM"),
-    ),
 )
 
 
@@ -47,4 +41,3 @@ def matching_markers(gene_names: list[str], profile: AntibioticProfile) -> list[
         if any(marker.lower() in normalized for marker in profile.resistance_markers):
             matches.append(gene)
     return sorted(set(matches))
-

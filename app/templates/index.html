@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Genome Firewall</title>
+  <meta name="description" content="Genome-to-antibiotic response research prototype for Klebsiella pneumoniae.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Genome Firewall home">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>GENOME <b>FIREWALL</b></span>
+    </a>
+    <div class="top-meta"><span class="pulse"></span> Research prototype <span class="mode">{{ app_mode }} mode</span></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="eyebrow">AI DEFENSE AGAINST ANTIMICROBIAL RESISTANCE</div>
+      <h1>Know what may fail.<br><em>Before the lab catches up.</em></h1>
+      <p>Upload a reconstructed <i>Klebsiella pneumoniae</i> genome. We combine AMRFinderPlus evidence with calibrated AI predictions to surface earlier, explainable antibiotic-response signals.</p>
+      <div class="guardrail"><span>DEFENSIVE BY CONSTRUCTION</span> This tool predicts resistance that already exists. It never designs or modifies organisms.</div>
+    </section>
+
+    <section class="workspace" aria-label="Genome analysis">
+      <div class="panel upload-panel">
+        <div class="panel-head"><span>01</span><div><h2>Genome intake</h2><p>Assembled nucleotide FASTA only</p></div></div>
+        <form id="upload-form">
+          <label class="dropzone" id="dropzone" for="file-input">
+            <input id="file-input" type="file" accept=".fa,.fasta,.fna" required>
+            <div class="upload-icon">↑</div>
+            <strong>Drop a FASTA file here</strong>
+            <span>or click to browse · up to 10 MB</span>
+            <small id="file-name">.FA · .FASTA · .FNA</small>
+          </label>
+          <div class="checks"><span>✓ Format validation</span><span>✓ Assembly quality checks</span><span>✓ Private temporary processing</span></div>
+          <button id="analyze-button" type="submit">Analyze genome <span>→</span></button>
+        </form>
+      </div>
+
+      <aside class="panel flow-panel">
+        <div class="panel-head"><span>↳</span><div><h2>Analysis pipeline</h2><p>Transparent at every step</p></div></div>
+        <ol class="pipeline" id="pipeline">
+          <li data-step="validate"><b>Validate</b><span>FASTA format & quality</span></li>
+          <li data-step="annotate"><b>Annotate</b><span>AMRFinderPlus genes & mutations</span></li>
+          <li data-step="predict"><b>Predict</b><span>GCP Vertex AI AutoML endpoint</span></li>
+          <li data-step="explain"><b>Explain</b><span>Target gate & evidence fusion</span></li>
+        </ol>
+        <div class="scope"><small>CURRENT COVERAGE</small><strong>Klebsiella pneumoniae</strong><span>4 antibiotics · assembled genomes</span></div>
+      </aside>
+    </section>
+
+    <section id="loading" class="loading hidden" aria-live="polite">
+      <div class="scanline"></div><span>Processing genome…</span>
+    </section>
+
+    <section id="error-box" class="error-box hidden" role="alert"></section>
+
+    <section id="results" class="results hidden" aria-live="polite">
+      <div class="result-header">
+        <div><div class="eyebrow">DECISION REPORT</div><h2>Antibiotic response profile</h2></div>
+        <div class="sample-meta"><span id="sample-id"></span><span id="elapsed"></span></div>
+      </div>
+      <div id="quality-card" class="quality-card"></div>
+      <div id="result-grid" class="result-grid"></div>
+      <details class="evidence-table">
+        <summary>View AMRFinderPlus evidence <span id="hit-count"></span></summary>
+        <div id="hits"></div>
+      </details>
+      <div class="clinical-warning"><b>Mandatory confirmation</b><span id="disclaimer"></span></div>
+    </section>
+  </main>
+
+  <footer><span>Genome Firewall · Hack-Nation 2026</span><span>Research use only · Not a medical device</span></footer>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
+

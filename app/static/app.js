@@ -34,8 +34,21 @@ form.addEventListener('submit', async event => {
   data.append('file', input.files[0]);
   try {
     const response = await fetch('/api/analyze', { method: 'POST', body: data });
-    const payload = await response.json();
-    if (!response.ok) throw new Error(payload.error || 'Analysis failed.');
+    const responseText = await response.text();
+    let payload = null;
+    if (responseText) {
+      try {
+        payload = JSON.parse(responseText);
+      } catch {
+        throw new Error(`The server returned an invalid response (HTTP ${response.status}).`);
+      }
+    }
+    if (!response.ok) {
+      throw new Error(payload?.error || `The analysis service failed (HTTP ${response.status}).`);
+    }
+    if (!payload) {
+      throw new Error('The analysis service returned an empty response. Please try again.');
+    }
     renderResults(payload);
   } catch (error) {
     errorBox.textContent = error.message;
@@ -82,4 +95,3 @@ function hitTemplate(hit) {
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
 }
-

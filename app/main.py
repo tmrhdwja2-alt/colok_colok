@@ -1,6 +1,7 @@
 """FastAPI entry point for the Colok Colok research prototype."""
 
 from pathlib import Path
+import logging
 import tempfile
 import time
 from uuid import uuid4
@@ -20,6 +21,23 @@ BASE_DIR = Path(__file__).resolve().parent
 app = FastAPI(title="Colok Colok", version="0.1.0")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+logger = logging.getLogger(__name__)
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    """Return a stable JSON contract for unexpected API failures."""
+    logger.error(
+        "Unhandled error while processing %s",
+        request.url.path,
+        exc_info=exc,
+    )
+    if request.url.path.startswith("/api/"):
+        return JSONResponse(
+            {"error": "The analysis service encountered an unexpected error."},
+            status_code=500,
+        )
+    return JSONResponse({"error": "Internal server error."}, status_code=500)
 
 
 @app.get("/", response_class=HTMLResponse)

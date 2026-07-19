@@ -48,7 +48,7 @@ These figures are artifact metadata, not an independent reproduction. For challe
 
 Pickle/joblib artifacts can execute code during loading. Only replace this file with a trusted artifact produced by the team, and update the documented checksum whenever it changes.
 
-The Docker image installs the Bioconda package `ncbi-amrfinderplus=4.2.7` and downloads its reference database during the image build.
+The Docker image installs the Bioconda package `ncbi-amrfinderplus=4.2.7`, downloads its reference database during the image build, and points `AMRFINDER_DB` to the updater-managed `latest` symlink.
 
 ## Decision policy
 

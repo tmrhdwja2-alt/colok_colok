@@ -16,7 +16,7 @@ RUN mkdir -p /app/uploads /app/amrfinder-data \
 USER $MAMBA_USER
 ENV PATH=/opt/conda/bin:$PATH \
     PYTHONUNBUFFERED=1 \
-    AMRFINDER_DB=/app/amrfinder-data
+    AMRFINDER_DB=/app/amrfinder-data/latest
 
 RUN amrfinder_update --database /app/amrfinder-data
 

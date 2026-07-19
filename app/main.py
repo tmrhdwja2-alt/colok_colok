@@ -1,6 +1,7 @@
 """FastAPI entry point for the Colok Colok research prototype."""
 
 from pathlib import Path
+import asyncio
 import logging
 import tempfile
 import time
@@ -14,7 +15,6 @@ from fastapi.templating import Jinja2Templates
 from app.amrfinder import run_amrfinder
 from app.config import settings
 from app.fasta import FastaValidationError, validate_fasta
-from app.predictor import load_model_bundle, predict
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -51,12 +51,14 @@ async def home(request: Request):
 
 @app.get("/health")
 async def health():
-    bundle = load_model_bundle()
+    model_path = Path(settings.model_path)
+    if not model_path.is_absolute():
+        model_path = BASE_DIR.parent / model_path
     return {
         "status": "ok",
         "annotation_mode": settings.app_mode,
         "prediction_engine": "xgboost-local",
-        "model_features": len(bundle["feature_columns"]),
+        "model_available": model_path.is_file(),
     }
 
 
@@ -81,9 +83,15 @@ async def analyze(file: UploadFile = File(...)):
         with tempfile.TemporaryDirectory(prefix="colok-colok-") as directory:
             fasta_path = Path(directory) / f"sample{suffix}"
             fasta_path.write_bytes(content)
-            hits, annotation_engine = run_amrfinder(fasta_path)
+            hits, annotation_engine = await asyncio.to_thread(
+                run_amrfinder,
+                fasta_path,
+            )
             hit_dicts = [hit.to_dict() for hit in hits]
-            predictions, model_engine = predict(hit_dicts)
+            predictions, model_engine = await asyncio.to_thread(
+                _predict,
+                hit_dicts,
+            )
     except (RuntimeError, TimeoutError) as exc:
         return JSONResponse({"error": str(exc)}, status_code=502)
 
@@ -107,3 +115,10 @@ async def analyze(file: UploadFile = File(...)):
         "elapsed_seconds": elapsed,
         "disclaimer": "Research prototype only. Confirm every result with standard laboratory testing and qualified professional review.",
     }
+
+
+def _predict(hit_dicts: list[dict]):
+    """Load the ML runtime only after AMRFinderPlus releases its resources."""
+    from app.predictor import predict
+
+    return predict(hit_dicts)

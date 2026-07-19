@@ -1,4 +1,4 @@
-"""FastAPI entry point for the Genome Firewall research prototype."""
+"""FastAPI entry point for the Colok Colok research prototype."""
 
 from pathlib import Path
 import tempfile
@@ -17,7 +17,7 @@ from app.predictor import predict
 
 
 BASE_DIR = Path(__file__).resolve().parent
-app = FastAPI(title="Genome Firewall", version="0.1.0")
+app = FastAPI(title="Colok Colok", version="0.1.0")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
@@ -54,7 +54,7 @@ async def analyze(file: UploadFile = File(...)):
 
     sample_id = f"GF-{uuid4().hex[:8].upper()}"
     try:
-        with tempfile.TemporaryDirectory(prefix="genome-firewall-") as directory:
+        with tempfile.TemporaryDirectory(prefix="colok-colok-") as directory:
             fasta_path = Path(directory) / f"sample{suffix}"
             fasta_path.write_bytes(content)
             hits, annotation_engine = run_amrfinder(fasta_path)
@@ -83,4 +83,3 @@ async def analyze(file: UploadFile = File(...)):
         "elapsed_seconds": elapsed,
         "disclaimer": "Research prototype only. Confirm every result with standard laboratory testing and qualified professional review.",
     }
-

@@ -1,2 +1,1 @@
-"""Genome Firewall application package."""
-
+"""Colok Colok application package."""

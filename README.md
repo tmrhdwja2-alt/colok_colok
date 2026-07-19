@@ -1,6 +1,6 @@
-# Genome Firewall
+# Colok Colok
 
-Genome Firewall is a defensive research prototype for the Hack-Nation Genome Firewall challenge. It accepts a quality-checked, reconstructed *Klebsiella pneumoniae* genome in FASTA format, detects existing antimicrobial-resistance evidence with AMRFinderPlus, and sends structured gene features to a GCP Vertex AI AutoML endpoint. The report combines model output with a deterministic molecular-target gate and transparent evidence categories.
+Colok Colok is a defensive research prototype for the Hack-Nation Genome Firewall challenge. It accepts a quality-checked, reconstructed *Klebsiella pneumoniae* genome in FASTA format, detects existing antimicrobial-resistance evidence with AMRFinderPlus, and sends structured gene features to a GCP Vertex AI AutoML endpoint. The report combines model output with a deterministic molecular-target gate and transparent evidence categories.
 
 > Research prototype only. Every result must be confirmed by standard laboratory testing and qualified professional review. This software is not a medical device and must not make treatment decisions autonomously.
 
@@ -38,8 +38,8 @@ Open `http://localhost:8000` and upload `sample_data/demo_klebsiella.fasta`.
 For the full containerized pipeline:
 
 ```bash
-docker build -t genome-firewall .
-docker run --rm -p 10000:10000 --env-file .env genome-firewall
+docker build -t colok-colok .
+docker run --rm -p 10000:10000 --env-file .env colok-colok
 ```
 
 ## Training dataset

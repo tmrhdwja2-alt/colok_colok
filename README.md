@@ -38,6 +38,8 @@ Artifact SHA-256:
 
 The artifact metadata reports that it was trained on `ml_dataset_gene_final.csv` without SMOTE, using a stratified 80/20 split and `random_state=42`.
 
+See [`data_pipeline/README.md`](data_pipeline/README.md) for the full data provenance: how genomes and labels were sourced from BV-BRC, how AMRFinderPlus annotation was run, and how `ml_dataset_gene_final.csv` (and its train-only-SMOTE variant, for AutoML experiments) were built, with the exact scripts used.
+
 | Reported metric | Value |
 | --- | ---: |
 | Macro recall | 0.7059 |

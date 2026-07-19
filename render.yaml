@@ -9,11 +9,7 @@ services:
         value: demo
       - key: MAX_UPLOAD_MB
         value: 10
-      - key: GCP_PROJECT_ID
-        sync: false
-      - key: GCP_REGION
-        value: us-central1
-      - key: GCP_ENDPOINT_ID
-        sync: false
-      - key: GCP_SERVICE_ACCOUNT_JSON_BASE64
-        sync: false
+      - key: MODEL_PATH
+        value: models/best_model_xgboost_final.pkl
+      - key: NO_CALL_THRESHOLD
+        value: 0.60

@@ -1,6 +1,6 @@
 # Colok Colok
 
-Colok Colok is a defensive research prototype for the Hack-Nation Genome Firewall challenge. It accepts a quality-checked, reconstructed *Klebsiella pneumoniae* genome in FASTA format, detects existing antimicrobial-resistance evidence with AMRFinderPlus, and sends structured gene features to a GCP Vertex AI AutoML endpoint. The report combines model output with a deterministic molecular-target gate and transparent evidence categories.
+Colok Colok is a defensive research prototype for the Hack-Nation Genome Firewall challenge. It accepts a reconstructed *Klebsiella pneumoniae* genome in FASTA format, detects existing antimicrobial-resistance evidence with AMRFinderPlus, and predicts antibiotic response with a bundled XGBoost model.
 
 > Research prototype only. Every result must be confirmed by standard laboratory testing and qualified professional review. This software is not a medical device and must not make treatment decisions autonomously.
 
@@ -9,21 +9,52 @@ Colok Colok is a defensive research prototype for the Hack-Nation Genome Firewal
 - Species: *Klebsiella pneumoniae* only
 - Input: reconstructed nucleotide assembly (`.fa`, `.fasta`, or `.fna`)
 - Antibiotics: meropenem, ciprofloxacin, and gentamicin
-- Output: Likely to Work, Likely to Fail, or No-call, with calibrated confidence and evidence
+- Output: Likely to Work, Likely to Fail, or No-call, with model confidence and supporting AMR evidence
 - Explicitly excluded: sample collection, sequencing, assembly, species identification, mixed-sample separation, organism design, and organism modification
 
 ## Pipeline
 
 1. Validate FASTA structure, nucleotide alphabet, size, ambiguity, and fragmentation.
 2. Run AMRFinderPlus in nucleotide mode for *K. pneumoniae*.
-3. Convert detected genes and mutations into the exact 398-column presence/absence schema used by `ml_dataset_gene_final_smote.csv`.
-4. Send one instance per antibiotic to a Vertex AI AutoML Endpoint.
-5. Apply confidence thresholds and the species-level molecular-target gate.
+3. Convert detected genes and mutations into the bundled model's 401-feature schema.
+4. Add the antibiotic one-hot features and run local XGBoost inference.
+5. Apply the confidence-based No-call policy and species-level molecular-target gate.
 6. Combine model output with known AMR evidence and render the decision report.
+
+## Bundled model
+
+The application loads `models/best_model_xgboost_final.pkl` with `joblib`. The trusted artifact contains:
+
+- an `XGBClassifier` with three output classes;
+- a `LabelEncoder` for `likely to fail`, `likely to work`, and `uncertain`;
+- the exact ordered list of 401 input features;
+- held-out evaluation metadata.
+
+Artifact SHA-256:
+
+```text
+68484b94a91dfd1cf4ab96b76d57bf7af351d133d75e33405ad559b3076b2e42
+```
+
+The artifact metadata reports that it was trained on `ml_dataset_gene_final.csv` without SMOTE, using a stratified 80/20 split and `random_state=42`.
+
+| Reported metric | Value |
+| --- | ---: |
+| Macro recall | 0.7059 |
+| Macro F1 | 0.7116 |
+| Balanced accuracy | 0.7059 |
+
+These figures are artifact metadata, not an independent reproduction. For challenge evaluation, the model should also be tested on the organizer's genetically grouped held-out split to rule out sequence-homology leakage.
+
+Pickle/joblib artifacts can execute code during loading. Only replace this file with a trusted artifact produced by the team, and update the documented checksum whenever it changes.
+
+## Decision policy
+
+The model returns probabilities for all three classes. The highest-probability class is used unless its confidence is below `NO_CALL_THRESHOLD`, in which case the result is No-call. A model prediction is kept separate from known AMRFinderPlus evidence; statistical importance is never presented as proof of biological causality.
 
 ## Local development
 
-Python 3.11 and AMRFinderPlus are recommended. Without the AMRFinderPlus executable, the app returns deterministic, clearly labeled demo annotations. This fallback is for interface demonstrations only.
+Python 3.11 or 3.12 and AMRFinderPlus are recommended. Without the AMRFinderPlus executable, the app returns deterministic, clearly labeled demo annotations. The XGBoost model is always used for prediction.
 
 ```bash
 python -m venv .venv
@@ -42,66 +73,14 @@ docker build -t colok-colok .
 docker run --rm -p 10000:10000 --env-file .env colok-colok
 ```
 
-## Training dataset
-
-The model contract is based on:
-
-`hack_nation/datasets/klebsiella_pneumoniae/ml_dataset_gene_final_smote.csv`
-
-The current file contains 4,353 rows and 401 columns: `antibiotic`, the three-class label `final_call`, 398 binary AMR gene or mutation features, and the organizer-provided `data_split`. The split contains 3,753 training, 300 validation, and 300 test rows. `data_split` is used for evaluation partitioning and removed from model inputs to prevent leakage. The source dataset is intentionally not copied into this repository. Run the preparation script against the organizer-provided file:
-
-```bash
-python scripts/prepare_automl_data.py \
-  --input /path/to/ml_dataset_gene_final_smote.csv \
-  --output training_data/automl_training.csv
-```
-
-Upload the generated 400-column CSV to Cloud Storage and use `final_call` as the Vertex AI AutoML Tabular classification target. Keep `antibiotic` as a categorical input and all remaining columns as numeric binary inputs. Preserve the organizer split when creating the corresponding Vertex AI training, validation, and test data sources; do not randomly re-split rows.
-
-> SMOTE is useful only inside the training partition. Do not apply synthetic oversampling before creating genetically grouped train, calibration, and held-out test splits, because that can leak information and inflate evaluation results.
-
-## Vertex AI prediction contract
-
-The app sends three dense feature objects, one per antibiotic. The keys exactly match the training CSV schema:
-
-```json
-{
-  "antibiotic": "meropenem",
-  "blaKPC_2": 1,
-  "ompK36_K231SfsTer16": 1,
-  "oqxA": 0
-}
-```
-
-Vertex AI AutoML Tabular should return one classification object per input instance. Both standard response variants below are supported (`displayNames`/`confidences` or `classes`/`scores`):
-
-```json
-{
-  "displayNames": ["likely to fail", "likely to work", "uncertain"],
-  "confidences": [0.91, 0.06, 0.03]
-}
-```
-
-Decision thresholds are intentionally conservative:
-
-- `p(resistant) > 0.65`: Likely to Fail
-- `p(resistant) < 0.35`: Likely to Work
-- otherwise: No-call
-
-The model should be trained and calibrated with genetically grouped splits so near-identical genomes never occur in both training and test sets. Report balanced accuracy, resistant and susceptible recall, F1, AUROC, PR-AUC, Brier score, reliability, no-call rate, and called-case accuracy per antibiotic.
-
 ## Configuration
 
 | Variable | Purpose |
 | --- | --- |
-| `APP_MODE` | `demo` uses deterministic UI predictions; `production` requires Vertex AI |
+| `APP_MODE` | Controls annotation fallback labeling; use `production` on Render |
 | `MAX_UPLOAD_MB` | Upload limit, default `10` |
-| `GCP_PROJECT_ID` | GCP project containing the endpoint |
-| `GCP_REGION` | Endpoint region, default `us-central1` |
-| `GCP_ENDPOINT_ID` | Deployed Vertex AI Endpoint ID |
-| `MODEL_SCHEMA_PATH` | Packaged list of the 398 model feature columns |
-| `GOOGLE_APPLICATION_CREDENTIALS` | Local service-account JSON path |
-| `GCP_SERVICE_ACCOUNT_JSON_BASE64` | Base64 service-account JSON for Render |
+| `MODEL_PATH` | Trusted joblib model bundle path |
+| `NO_CALL_THRESHOLD` | Minimum winning-class confidence, default `0.60` |
 
 ## Safety and privacy
 
@@ -113,9 +92,9 @@ The model should be trained and calibrated with genetically grouped splits so ne
 
 ## API
 
-- `GET /health` - health and mode check
+- `GET /health` - model and service health check
 - `POST /api/analyze` - multipart upload using the `file` field
 
 ## License
 
-Prototype code is provided for hackathon demonstration and research evaluation. AMRFinderPlus is developed by NCBI and is public domain. Review the licenses and attribution requirements of every training dataset and deployed model before redistribution.
+Prototype code is provided for hackathon demonstration and research evaluation. AMRFinderPlus is developed by NCBI and is public domain. Review the licenses and attribution requirements of every training dataset and model artifact before redistribution.

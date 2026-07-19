@@ -13,7 +13,7 @@ from fastapi.templating import Jinja2Templates
 from app.amrfinder import run_amrfinder
 from app.config import settings
 from app.fasta import FastaValidationError, validate_fasta
-from app.predictor import predict
+from app.predictor import load_model_bundle, predict
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -33,7 +33,13 @@ async def home(request: Request):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "mode": settings.app_mode}
+    bundle = load_model_bundle()
+    return {
+        "status": "ok",
+        "annotation_mode": settings.app_mode,
+        "prediction_engine": "xgboost-local",
+        "model_features": len(bundle["feature_columns"]),
+    }
 
 
 @app.post("/api/analyze")
